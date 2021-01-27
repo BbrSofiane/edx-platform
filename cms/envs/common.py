@@ -293,8 +293,6 @@ FEATURES = {
     # Special Exams, aka Timed and Proctored Exams
     'ENABLE_SPECIAL_EXAMS': False,
 
-    'ORGANIZATIONS_APP': False,
-
     # Show the language selector in the header
     'SHOW_HEADER_LANGUAGE_SELECTOR': False,
 
@@ -342,7 +340,7 @@ FEATURES = {
     'ENABLE_ENROLLMENT_RESET': False,
     'DISABLE_MOBILE_COURSE_AVAILABLE': False,
 
-    # .. toggle_name: ENABLE_CHANGE_USER_PASSWORD_ADMIN
+    # .. toggle_name: FEATURES['ENABLE_CHANGE_USER_PASSWORD_ADMIN']
     # .. toggle_implementation: DjangoSetting
     # .. toggle_default: False
     # .. toggle_description: Set to True to enable changing a user password through django admin. This is disabled by
@@ -355,7 +353,7 @@ FEATURES = {
     'ENABLE_CHANGE_USER_PASSWORD_ADMIN': False,
 
     ### ORA Feature Flags ###
-    # .. toggle_name: ENABLE_ORA_ALL_FILE_URLS
+    # .. toggle_name: FEATURES['ENABLE_ORA_ALL_FILE_URLS']
     # .. toggle_implementation: DjangoSetting
     # .. toggle_default: False
     # .. toggle_description: A "work-around" feature toggle meant to help in cases where some file uploads are not
@@ -368,7 +366,7 @@ FEATURES = {
     # .. toggle_warnings: This temporary feature toggle does not have a target removal date.
     'ENABLE_ORA_ALL_FILE_URLS': False,
 
-    # .. toggle_name: ENABLE_ORA_USER_STATE_UPLOAD_DATA
+    # .. toggle_name: FEATURES['ENABLE_ORA_USER_STATE_UPLOAD_DATA']
     # .. toggle_implementation: DjangoSetting
     # .. toggle_default: False
     # .. toggle_description: A "work-around" feature toggle meant to help in cases where some file uploads are not
@@ -380,7 +378,7 @@ FEATURES = {
     # .. toggle_warnings: This temporary feature toggle does not have a target removal date.
     'ENABLE_ORA_USER_STATE_UPLOAD_DATA': False,
 
-    # .. toggle_name: DEPRECATE_OLD_COURSE_KEYS_IN_STUDIO
+    # .. toggle_name: FEATURES['DEPRECATE_OLD_COURSE_KEYS_IN_STUDIO']
     # .. toggle_implementation: DjangoSetting
     # .. toggle_default: True
     # .. toggle_description: Warn about removing support for deprecated course keys.
@@ -396,7 +394,7 @@ FEATURES = {
     # .. toggle_tickets: https://openedx.atlassian.net/browse/DEPR-58
     'DEPRECATE_OLD_COURSE_KEYS_IN_STUDIO': True,
 
-    # .. toggle_name: ENABLE_LIBRARY_AUTHORING_MICROFRONTEND
+    # .. toggle_name: FEATURES['ENABLE_LIBRARY_AUTHORING_MICROFRONTEND']
     # .. toggle_implementation: DjangoSetting
     # .. toggle_default: False
     # .. toggle_description: Set to True to enable the Library Authoring MFE
@@ -1020,6 +1018,11 @@ COURSE_IMPORT_EXPORT_STORAGE = 'django.core.files.storage.FileSystemStorage'
 ##### EMBARGO #####
 EMBARGO_SITE_REDIRECT_URL = None
 
+##### custom vendor plugin variables #####
+# JavaScript code can access this data using `process.env.JS_ENV_EXTRA_CONFIG`
+# One of the current use cases for this is enabling custom TinyMCE plugins
+JS_ENV_EXTRA_CONFIG = {}
+
 ############################### PIPELINE #######################################
 
 PIPELINE = {
@@ -1360,6 +1363,9 @@ INSTALLED_APPS = [
     'common.djangoapps.track',
     'eventtracking.django.apps.EventTrackingConfig',
 
+    # Backends for receiving edX LMS events
+    'event_routing_backends.apps.EventRoutingBackendsConfig',
+
     # For asset pipelining
     'common.djangoapps.edxmako.apps.EdxMakoConfig',
     'pipeline',
@@ -1375,6 +1381,7 @@ INSTALLED_APPS = [
 
     # Discussion
     'openedx.core.djangoapps.django_comment_common',
+    'openedx.core.djangoapps.discussions',
 
     # for course creator table
     'django.contrib.admin',
@@ -1513,6 +1520,9 @@ INSTALLED_APPS = [
     'openedx.core.djangoapps.content.learning_sequences.apps.LearningSequencesConfig',
 
     'ratelimitbackend',
+
+    # Database-backed Organizations App (http://github.com/edx/edx-organizations)
+    'organizations',
 ]
 
 
@@ -1532,6 +1542,7 @@ SUPPORT_SITE_LINK = ''
 ID_VERIFICATION_SUPPORT_LINK = ''
 PASSWORD_RESET_SUPPORT_LINK = ''
 ACTIVATION_EMAIL_SUPPORT_LINK = ''
+LOGIN_ISSUE_SUPPORT_LINK = ''
 
 ############################## EVENT TRACKING #################################
 
@@ -1641,9 +1652,6 @@ OPTIONAL_APPS = (
     # edxval
     ('edxval', 'openedx.core.djangoapps.content.course_overviews.apps.CourseOverviewsConfig'),
 
-    # Organizations App (http://github.com/edx/edx-organizations)
-    ('organizations', None),
-
     # Enterprise App (http://github.com/edx/edx-enterprise)
     ('enterprise', None),
     ('consent', None),
@@ -1705,10 +1713,6 @@ DEFAULT_COURSE_LANGUAGE = "en"
 #               None to omit.
 #
 ADVANCED_PROBLEM_TYPES = [
-    {
-        'component': 'openassessment',
-        'boilerplate_name': None,
-    },
     {
         'component': 'drag-and-drop-v2',
         'boilerplate_name': None
@@ -2083,10 +2087,6 @@ ANALYTICS_DASHBOARD_NAME = 'Your Platform Name Here Insights'
 COMMENTS_SERVICE_URL = 'http://localhost:18080'
 COMMENTS_SERVICE_KEY = 'password'
 
-CAS_SERVER_URL = ""
-CAS_EXTRA_LOGIN_PARAMS = ""
-CAS_ATTRIBUTE_CALLBACK = ""
-
 FINANCIAL_REPORTS = {
     'STORAGE_TYPE': 'localfs',
     'BUCKET': None,
@@ -2216,6 +2216,9 @@ BLOCKSTORE_API_URL = 'http://localhost:18250/api/v1/'
 # in the blockstore-based XBlock runtime
 XBLOCK_RUNTIME_V2_EPHEMERAL_DATA_CACHE = 'default'
 
+# Blockstore data could contain S3 links, so this should be lower than Blockstore's AWS_QUERYSTRING_EXPIRE
+BLOCKSTORE_BUNDLE_CACHE_TIMEOUT = 169200
+
 ###################### LEARNER PORTAL ################################
 LEARNER_PORTAL_URL_ROOT = 'https://learner-portal-localhost:18000'
 
@@ -2294,3 +2297,43 @@ VERIFY_STUDENT = {
     # The variable represents the window within which a verification is considered to be "expiring soon."
     "EXPIRING_SOON_WINDOW": 28,
 }
+
+######################## Organizations ########################
+
+# .. toggle_name: ORGANIZATIONS_AUTOCREATE
+# .. toggle_implementation: DjangoSetting
+# .. toggle_default: True
+# .. toggle_description: When enabled, creating a course run or content library with
+#   an "org slug" that does not map to an Organization in the database will trigger the
+#   creation of a new Organization, with its name and short_name set to said org slug.
+#   When disabled, creation of such content with an unknown org slug will instead
+#   result in a validation error.
+#   If you want the Organization table to be an authoritative information source in
+#   Studio, then disable this; however, if you want the table to just be a reflection of
+#   the orgs referenced in Studio content, then leave it enabled.
+# .. toggle_use_cases: open_edx
+# .. toggle_creation_date: 2020-11-02
+# .. toggle_tickets: https://github.com/edx/edx-organizations/blob/master/docs/decisions/0001-phase-in-db-backed-organizations-to-all.rst
+ORGANIZATIONS_AUTOCREATE = True
+
+################# Settings for brand logos. #################
+LOGO_IMAGE_EXTRA_TEXT = ''
+LOGO_URL = None
+LOGO_URL_PNG = None
+LOGO_TRADEMARK_URL = None
+FAVICON_URL = None
+DEFAULT_EMAIL_LOGO_URL = 'https://edx-cdn.org/v3/default/logo.png'
+
+# .. toggle_name: ERROR_ON_DEPRECATED_EDX_PLATFORM_IMPORTS
+# .. toggle_implementation: DjangoSetting
+# .. toggle_default: False
+# .. toggle_use_cases: temporary
+# .. toggle_creation_date: 2021-01-20
+# .. toggle_target_removal_date: 2021-01-27
+# .. toggle_tickets: https://github.com/edx/edx-platform/pull/25932
+# .. toggle_description: Whether to raise an exception where,
+#   normally, a DeprecatedEdxPlatformImportWarning would be raised.
+#   This will allow us to test dropping support for the deprecated
+#   import paths without yet removing all of the import_shims
+#   machinery.
+ERROR_ON_DEPRECATED_EDX_PLATFORM_IMPORTS = False

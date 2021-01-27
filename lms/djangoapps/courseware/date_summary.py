@@ -193,7 +193,6 @@ class DateSummary(object):
 
         Note: this returns a span that will be localized on the client.
         """
-        locale = to_locale(get_language())
         user_timezone = user_timezone_locale_prefs(crum.get_current_request())['user_timezone']
         return HTML(
             u'<span class="date localized-datetime" data-format="{date_format}" data-datetime="{date_time}"'
@@ -203,7 +202,7 @@ class DateSummary(object):
             date_format=date_format,
             date_time=self.date,
             user_timezone=user_timezone,
-            user_language=locale,
+            user_language=get_language(),
         )
 
     @property
@@ -664,11 +663,11 @@ class VerificationDeadlineDate(DateSummary):
             'verification-deadline-passed': (_('Learn More'), ''),
             'verification-deadline-retry': (
                 _('Retry Verification'),
-                IDVerificationService.get_verify_location('verify_student_reverify'),
+                IDVerificationService.get_verify_location(),
             ),
             'verification-deadline-upcoming': (
                 _('Verify My Identity'),
-                IDVerificationService.get_verify_location('verify_student_verify_now', self.course_id),
+                IDVerificationService.get_verify_location(self.course_id),
             )
         }
 

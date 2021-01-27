@@ -16,7 +16,7 @@ import pytz
 from crum import get_current_request, impersonate
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
-from edx_toggles.toggles import WaffleFlag, WaffleFlagNamespace
+from edx_toggles.toggles import LegacyWaffleFlag, LegacyWaffleFlagNamespace
 
 from common.djangoapps.course_modes.models import CourseMode
 from common.djangoapps.entitlements.models import CourseEntitlement
@@ -35,8 +35,8 @@ from common.djangoapps.track import segment
 # .. toggle_target_removal_date: None
 # .. toggle_tickets: REVEM-282
 # .. toggle_warnings: This temporary feature toggle does not have a target removal date.
-DISCOUNT_APPLICABILITY_FLAG = WaffleFlag(
-    waffle_namespace=WaffleFlagNamespace(name=u'discounts'),
+DISCOUNT_APPLICABILITY_FLAG = LegacyWaffleFlag(
+    waffle_namespace=LegacyWaffleFlagNamespace(name=u'discounts'),
     flag_name=u'enable_discounting',
     module_name=__name__,
 )
@@ -64,7 +64,7 @@ def get_discount_expiration_date(user, course):
 
     time_limit_start = None
     try:
-        saw_banner = ExperimentData.objects.get(user=user, experiment_id=REV1008_EXPERIMENT_ID, key=str(course))
+        saw_banner = ExperimentData.objects.get(user=user, experiment_id=REV1008_EXPERIMENT_ID, key=str(course.id))
         time_limit_start = parse_datetime(saw_banner.value)
     except ExperimentData.DoesNotExist:
         return None
@@ -150,7 +150,7 @@ def _is_in_holdback_and_bucket(user):
         return False
 
     # Holdback is 10%
-    bucket = stable_bucketing_hash_group(DISCOUNT_APPLICABILITY_HOLDBACK, 10, user.username)
+    bucket = stable_bucketing_hash_group(DISCOUNT_APPLICABILITY_HOLDBACK, 10, user)
 
     request = get_current_request()
     if hasattr(request, 'session') and DISCOUNT_APPLICABILITY_HOLDBACK not in request.session:

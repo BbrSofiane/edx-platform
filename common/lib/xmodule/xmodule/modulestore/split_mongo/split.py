@@ -83,7 +83,7 @@ from xblock.fields import Reference, ReferenceList, ReferenceValueDict, Scope
 
 from xmodule.assetstore import AssetMetadata
 from xmodule.course_module import CourseSummary
-from xmodule.error_module import ErrorDescriptor
+from xmodule.error_module import ErrorBlock
 from xmodule.errortracker import null_error_tracker
 from xmodule.library_content_module import LibrarySummary
 from xmodule.modulestore import (
@@ -988,7 +988,7 @@ class SplitMongoModuleStore(SplitBulkWriteMixin, ModuleStoreWriteBase):
             envelope = CourseEnvelope(locator, entry)
             root = entry['root']
             structures_list = self._load_items(envelope, [root], depth=0, **kwargs)
-            if not isinstance(structures_list[0], ErrorDescriptor):
+            if not isinstance(structures_list[0], ErrorBlock):
                 result.append(structures_list[0])
         return result
 
@@ -1072,6 +1072,19 @@ class SplitMongoModuleStore(SplitBulkWriteMixin, ModuleStoreWriteBase):
                 CourseSummary(course_locator, **course_summary)
             )
         return courses_summaries
+
+    def get_library_keys(self):
+        """
+        Returns a list of all unique content library keys in the Split
+        modulestore.
+
+        Returns: list[LibraryLocator]
+        """
+        return list({
+            self._create_library_locator(library_index, branch=None)
+            for library_index
+            in self.find_matching_course_indexes(branch="library")
+        })
 
     @autoretry_read()
     def get_library_summaries(self, **kwargs):

@@ -23,13 +23,16 @@ from django.urls import reverse
 from django.utils.translation import ugettext as _
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_http_methods
-from edx_toggles.toggles import WaffleSwitchNamespace
+from edx_toggles.toggles import LegacyWaffleSwitchNamespace
 from milestones import api as milestones_api
 from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import CourseKey
 from opaque_keys.edx.locator import BlockUsageLocator
+from organizations.api import add_organization_course, ensure_organization
+from organizations.exceptions import InvalidOrganizationException
 from six import text_type
 from six.moves import filter
+from edx_django_utils.monitoring import function_trace
 
 from cms.djangoapps.course_creators.views import add_user_with_status_unrequested, get_course_creator_status
 from cms.djangoapps.models.settings.course_grading import CourseGradingModel
@@ -66,14 +69,11 @@ from common.djangoapps.util.milestones_helpers import (
     set_prerequisite_courses
 )
 from openedx.core import toggles as core_toggles
-from common.djangoapps.util.organizations_helpers import (
-    add_organization_course, get_organization_by_short_name, organizations_enabled
-)
 from common.djangoapps.util.string_utils import _has_non_ascii_characters
 from common.djangoapps.xblock_django.api import deprecated_xblocks
 from xmodule.contentstore.content import StaticContent
 from xmodule.course_module import DEFAULT_START_DATE, CourseFields
-from xmodule.error_module import ErrorDescriptor
+from xmodule.error_module import ErrorBlock
 from xmodule.modulestore import EdxJSONEncoder
 from xmodule.modulestore.django import modulestore
 from xmodule.modulestore.exceptions import DuplicateCourseError, ItemNotFoundError
@@ -110,6 +110,7 @@ from .library import (
     get_library_creator_status,
     should_redirect_to_library_authoring_mfe
 )
+
 
 log = logging.getLogger(__name__)
 
@@ -413,7 +414,7 @@ def _accessible_courses_iter(request):
         """
         Filter out unusable and inaccessible courses
         """
-        if isinstance(course, ErrorDescriptor):
+        if isinstance(course, ErrorBlock):
             return False
 
         # Custom Courses for edX (CCX) is an edX feature for re-using course content.
@@ -488,6 +489,7 @@ def _accessible_courses_list_from_groups(request):
     return courses_list, []
 
 
+@function_trace('_accessible_libraries_iter')
 def _accessible_libraries_iter(user, org=None):
     """
     List all libraries available to the logged in user by iterating through all libraries.
@@ -500,7 +502,7 @@ def _accessible_libraries_iter(user, org=None):
         libraries = [] if org == '' else modulestore().get_libraries(org=org)
     else:
         libraries = modulestore().get_library_summaries()
-    # No need to worry about ErrorDescriptors - split's get_libraries() never returns them.
+    # No need to worry about ErrorBlocks - split's get_libraries() never returns them.
     return (lib for lib in libraries if has_studio_read_access(user, lib.location.library_key))
 
 
@@ -512,7 +514,7 @@ def course_listing(request):
     """
 
     optimization_enabled = GlobalStaff().has_user(request.user) and \
-        WaffleSwitchNamespace(name=WAFFLE_NAMESPACE).is_enabled(u'enable_global_staff_optimization')
+        LegacyWaffleSwitchNamespace(name=WAFFLE_NAMESPACE).is_enabled(u'enable_global_staff_optimization')
 
     org = request.GET.get('org', '') if optimization_enabled else None
     courses_iter, in_process_course_actions = get_courses_accessible_to_user(request, org)
@@ -697,6 +699,7 @@ def course_index(request, course_key):
         })
 
 
+@function_trace('get_courses_accessible_to_user')
 def get_courses_accessible_to_user(request, org=None):
     """
     Try to get all courses by first reversing django groups and fallback to old method if it fails
@@ -752,7 +755,7 @@ def _process_courses_list(courses_iter, in_process_course_actions, split_archive
     archived_courses = []
 
     for course in courses_iter:
-        if isinstance(course, ErrorDescriptor) or (course.id in in_process_action_course_keys):
+        if isinstance(course, ErrorBlock) or (course.id in in_process_action_course_keys):
             continue
 
         formatted_course = format_course_for_view(course)
@@ -887,10 +890,13 @@ def create_new_course(user, org, number, run, fields):
     Raises:
         DuplicateCourseError: Course run already exists.
     """
-    org_data = get_organization_by_short_name(org)
-    if not org_data and organizations_enabled():
-        raise ValidationError(_('You must link this course to an organization in order to continue. Organization '
-                                'you selected does not exist in the system, you will need to add it to the system'))
+    try:
+        org_data = ensure_organization(org)
+    except InvalidOrganizationException:
+        raise ValidationError(_(
+            'You must link this course to an organization in order to continue. Organization '
+            'you selected does not exist in the system, you will need to add it to the system'
+        ))
     store_for_new_course = modulestore().default_modulestore.get_modulestore_type()
     new_course = create_new_course_in_store(store_for_new_course, user, org, number, run, fields)
     add_organization_course(org_data, new_course.id)

@@ -384,6 +384,24 @@ class VideoStudentViewHandlers(object):
         return response
 
     @XBlock.handler
+    def student_view_user_state(self, request, suffix=''):
+        """
+        Endpoint to get user-specific state, like current position and playback speed,
+        without rendering the full student_view HTML. This is similar to student_view_state,
+        but that one cannot contain user-specific info.
+        """
+        view_state = self.student_view_data()
+        view_state.update({
+            "saved_video_position": self.saved_video_position.total_seconds(),
+            "speed": self.speed,
+        })
+        return Response(
+            json.dumps(view_state),
+            content_type='application/json',
+            charset='UTF-8'
+        )
+
+    @XBlock.handler
     def yt_video_metadata(self, request, suffix=''):
         """
         Endpoint to get YouTube metadata.
@@ -491,7 +509,7 @@ class VideoStudioViewHandlers(object):
                             content=transcript_file.read().decode('utf-8'),
                             input_format=Transcript.SRT,
                             output_format=Transcript.SJSON
-                        )
+                        ).encode()
                         create_or_update_video_transcript(
                             video_id=edx_video_id,
                             language_code=language_code,

@@ -21,7 +21,8 @@ from django.utils.translation import get_language
 from django.utils.translation import ugettext as _
 from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
 from django.views.decorators.debug import sensitive_post_parameters
-from edx_toggles.toggles import WaffleFlag, WaffleFlagNamespace
+from edx_django_utils.monitoring import set_custom_attribute
+from edx_toggles.toggles import LegacyWaffleFlag, LegacyWaffleFlagNamespace
 from pytz import UTC
 from ratelimit.decorators import ratelimit
 from requests import HTTPError
@@ -57,6 +58,7 @@ from openedx.core.djangoapps.user_authn.views.registration_form import (
     RegistrationFormFactory,
     get_registration_extension_form
 )
+from openedx.core.djangoapps.user_authn.toggles import is_require_third_party_auth_enabled
 from common.djangoapps.student.helpers import (
     AccountValidationError,
     authenticate_new_user,
@@ -104,8 +106,8 @@ REGISTER_USER = Signal(providing_args=["user", "registration"])
 # .. toggle_target_removal_date: 2020-06-01
 # .. toggle_warnings: This temporary feature toggle does not have a target removal date.
 # .. toggle_tickets: None
-REGISTRATION_FAILURE_LOGGING_FLAG = WaffleFlag(
-    waffle_namespace=WaffleFlagNamespace(name=u'registration'),
+REGISTRATION_FAILURE_LOGGING_FLAG = LegacyWaffleFlag(
+    waffle_namespace=LegacyWaffleFlagNamespace(name=u'registration'),
     flag_name=u'enable_failure_logging',
     module_name=__name__,
 )
@@ -182,6 +184,8 @@ def create_account_with_params(request, params):
             ]}
         )
 
+    if is_third_party_auth_enabled:
+        set_custom_attribute('register_user_tpa', pipeline.running(request))
     extended_profile_fields = configuration_helpers.get_value('extended_profile_fields', [])
     # Can't have terms of service for certain SHIB users, like at Stanford
     registration_fields = getattr(settings, 'REGISTRATION_EXTRA_FIELDS', {})
@@ -485,6 +489,12 @@ class RegistrationView(APIView):
                 address already exists
             HttpResponse: 403 operation not allowed
         """
+        if is_require_third_party_auth_enabled() and not pipeline.running(request):
+            # if request is not running a third-party auth pipeline
+            return HttpResponseForbidden(
+                "Third party authentication is required to register. Username and password were received instead."
+            )
+
         data = request.POST.copy()
         self._handle_terms_of_service(data)
 

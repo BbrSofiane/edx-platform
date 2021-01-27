@@ -44,6 +44,7 @@ from lms.djangoapps.certificates.models import (
 from lms.djangoapps.courseware.access import has_access
 from lms.djangoapps.courseware.courses import get_course_by_id, get_studio_url
 from lms.djangoapps.courseware.module_render import get_module_by_usage_id
+from lms.djangoapps.courseware.toggles import EXAM_RESUME_PROCTORING_IMPROVEMENTS
 from lms.djangoapps.discussion.django_comment_client.utils import available_division_schemes, has_forum_access
 from lms.djangoapps.grades.api import is_writable_gradebook_enabled
 from openedx.core.djangoapps.course_groups.cohorts import DEFAULT_COHORT_NAME, get_course_cohorts, is_course_cohorted
@@ -276,6 +277,7 @@ def _section_special_exams(course, access):
         'course_id': course_key,
         'escalation_email': escalation_email,
         'show_dashboard': is_backend_dashboard_available(course_key),
+        'enable_exam_resume_proctoring_improvements': EXAM_RESUME_PROCTORING_IMPROVEMENTS.is_enabled(course.id),
     }
     return section_data
 
@@ -601,7 +603,7 @@ def _section_data_download(course, access):
         settings.FEATURES.get('ENABLE_SPECIAL_EXAMS', False) and
         course.enable_proctored_exams
     )
-    section_key = 'data_download_2' if data_download_v2_is_enabled(course_key) else 'data_download'
+    section_key = 'data_download_2' if data_download_v2_is_enabled() else 'data_download'
     section_data = {
         'section_key': section_key,
         'section_display_name': _('Data Download'),

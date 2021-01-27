@@ -60,7 +60,9 @@ INSTALLED_APPS = (
     'django.contrib.sessions',
     'django.contrib.sites',
     'django_sites_extensions',
+    'lti_consumer',
     'openedx.core.djangoapps.django_comment_common',
+    'openedx.core.djangoapps.discussions',
     'openedx.core.djangoapps.video_config',
     'openedx.core.djangoapps.video_pipeline',
     'openedx.core.djangoapps.bookmarks.apps.BookmarksConfig',
@@ -131,3 +133,6 @@ RUN_BLOCKSTORE_TESTS = False
 SOFTWARE_SECURE_REQUEST_RETRY_DELAY = 60 * 60
 # Maximum of 6 retries before giving up.
 SOFTWARE_SECURE_RETRY_MAX_ATTEMPTS = 6
+
+# Don't tolerate deprecated edx-platform import usage in tests.
+ERROR_ON_DEPRECATED_EDX_PLATFORM_IMPORTS = True

@@ -21,7 +21,7 @@ from edx_proctoring.api import (
     get_exam_configuration_dashboard_url
 )
 from edx_proctoring.exceptions import ProctoredExamNotFoundException
-from edx_toggles.toggles import WaffleSwitch
+from edx_toggles.toggles import LegacyWaffleSwitch
 from help_tokens.core import HelpUrlExpert
 from opaque_keys.edx.keys import CourseKey
 from opaque_keys.edx.locator import LibraryUsageLocator
@@ -39,6 +39,7 @@ from common.djangoapps.edxmako.shortcuts import render_to_string
 from openedx.core.djangoapps.schedules.config import COURSE_UPDATE_WAFFLE_FLAG
 from openedx.core.lib.gating import api as gating_api
 from openedx.core.lib.xblock_utils import hash_resource, request_token, wrap_xblock, wrap_xblock_aside
+from openedx.core.djangoapps.bookmarks import api as bookmarks_api
 from common.djangoapps.static_replace import replace_static_urls
 from common.djangoapps.student.auth import has_studio_read_access, has_studio_write_access
 from openedx.core.toggles import ENTRANCE_EXAMS
@@ -91,7 +92,7 @@ NEVER = lambda x: False
 ALWAYS = lambda x: True
 
 
-highlights_setting = WaffleSwitch('dynamic_pacing', 'studio_course_update', __name__)
+highlights_setting = LegacyWaffleSwitch('dynamic_pacing', 'studio_course_update', __name__)
 
 
 def _filter_entrance_exam_grader(graders):
@@ -987,6 +988,8 @@ def _delete_item(usage_key, user):
             course.tabs = [tab for tab in existing_tabs if tab.get('url_slug') != usage_key.block_id]
             store.update_item(course, user.id)
 
+        # Delete user bookmarks
+        bookmarks_api.delete_bookmarks(usage_key)
         store.delete_item(usage_key, user.id)
 
 

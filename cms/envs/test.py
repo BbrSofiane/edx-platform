@@ -33,6 +33,7 @@ from lms.envs.test import (  # pylint: disable=wrong-import-order
     ECOMMERCE_API_URL,
     ENABLE_COMPREHENSIVE_THEMING,
     JWT_AUTH,
+    LOGIN_ISSUE_SUPPORT_LINK,
     MEDIA_ROOT,
     MEDIA_URL,
     PLATFORM_DESCRIPTION,
@@ -325,3 +326,6 @@ LOGISTRATION_RATELIMIT_RATE = '5/5m'
 LOGISTRATION_API_RATELIMIT = '5/m'
 
 REGISTRATION_VALIDATION_RATELIMIT = '5/minute'
+
+# Don't tolerate deprecated edx-platform import usage in tests.
+ERROR_ON_DEPRECATED_EDX_PLATFORM_IMPORTS = True

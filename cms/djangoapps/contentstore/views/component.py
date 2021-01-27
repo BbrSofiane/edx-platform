@@ -41,7 +41,7 @@ __all__ = [
 log = logging.getLogger(__name__)
 
 # NOTE: This list is disjoint from ADVANCED_COMPONENT_TYPES
-COMPONENT_TYPES = ['discussion', 'html', 'problem', 'video']
+COMPONENT_TYPES = ['discussion', 'html', 'openassessment', 'problem', 'video']
 
 ADVANCED_COMPONENT_TYPES = sorted(set(name for name, class_ in XBlock.load_classes()) - set(COMPONENT_TYPES))
 
@@ -122,10 +122,36 @@ def container_handler(request, usage_key_string):
 
             component_templates = get_component_templates(course)
             ancestor_xblocks = []
+            parent = get_parent_xblock(xblock)
             action = request.GET.get('action', 'view')
 
             is_unit_page = is_unit(xblock)
-            unit = xblock if is_unit_page else get_parent_xblock(xblock)
+            unit = xblock if is_unit_page else None
+
+            is_first = True
+            block = xblock
+
+            # Build the breadcrumbs and find the ``Unit`` ancestor
+            # if it is not the immediate parent.
+            while parent:
+
+                if unit is None and is_unit(block):
+                    unit = block
+
+                # add all to nav except current xblock page
+                if xblock != block:
+                    current_block = {
+                        'title': block.display_name_with_default,
+                        'children': parent.get_children(),
+                        'is_last': is_first
+                    }
+                    is_first = False
+                    ancestor_xblocks.append(current_block)
+
+                block = parent
+                parent = get_parent_xblock(parent)
+
+            ancestor_xblocks.reverse()
 
             assert unit is not None, "Could not determine unit page"
             subsection = get_parent_xblock(unit)
@@ -133,15 +159,6 @@ def container_handler(request, usage_key_string):
                 unit.location)
             section = get_parent_xblock(subsection)
             assert section is not None, "Could not determine ancestor section from unit " + six.text_type(unit.location)
-
-            # build the breadcrumbs
-            for block in (section, subsection):
-                parent = get_parent_xblock(block)
-                ancestor_xblocks.append({
-                    'title': block.display_name_with_default,
-                    'children': parent.get_children(),
-                    'is_last': block.category == 'sequential'
-                })
 
             # for the sequence navigator
             prev_url, next_url = get_sibling_urls(subsection)
@@ -260,7 +277,8 @@ def get_component_templates(courselike, library=False):
         'discussion': _("Discussion"),
         'html': _("HTML"),
         'problem': _("Problem"),
-        'video': _("Video")
+        'video': _("Video"),
+        'openassessment': _("Open Response")
     }
 
     component_templates = []
@@ -269,9 +287,11 @@ def get_component_templates(courselike, library=False):
     # by the components in the order listed in COMPONENT_TYPES.
     component_types = COMPONENT_TYPES[:]
 
-    # Libraries do not support discussions
+    # Libraries do not support discussions and openassessment
+    component_not_supported_by_library = ['discussion', 'openassessment']
     if library:
-        component_types = [component for component in component_types if component != 'discussion']
+        component_types = [component for component in component_types
+                           if component not in set(component_not_supported_by_library)]
 
     component_types = _filter_disabled_blocks(component_types)
 
@@ -288,9 +308,14 @@ def get_component_templates(courselike, library=False):
             # add the default template with localized display name
             # TODO: Once mixins are defined per-application, rather than per-runtime,
             # this should use a cms mixed-in class. (cpennington)
+            template_id = None
             display_name = xblock_type_display_name(category, _('Blank'))  # this is the Blank Advanced problem
+            # The first template that is given should be Blank Assessment Template
+            if category == 'openassessment':
+                display_name = _("Blank Open Response Assessment")
+                template_id = "blank-assessment"
             templates_for_category.append(
-                create_template_dict(display_name, category, support_level_without_template, None, 'advanced')
+                create_template_dict(display_name, category, support_level_without_template, template_id, 'advanced')
             )
             categories.add(category)
 
